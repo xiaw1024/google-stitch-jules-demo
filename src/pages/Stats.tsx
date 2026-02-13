@@ -1,6 +1,50 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useApp } from '../store/AppContext';
+import { getWordById } from '../data/mockWords';
+
+type TimeRange = 'week' | 'month' | 'quarter' | 'all';
+
 export default function Stats() {
+  const navigate = useNavigate();
+  const { state, getStats } = useApp();
+  const { user, learningRecords } = state;
+  const stats = getStats();
+
+  const [timeRange, setTimeRange] = useState<TimeRange>('week');
+
+  // 获取最近学习的单词
+  const recentRecords = [...learningRecords]
+    .sort((a, b) => new Date(b.lastReviewAt).getTime() - new Date(a.lastReviewAt).getTime())
+    .slice(0, 4)
+    .map(record => ({
+      record,
+      word: getWordById(record.wordId)
+    }))
+    .filter(item => item.word);
+
+  // 计算进度百分比
+  const getProgressPercentage = (record: typeof learningRecords[0]) => {
+    if (record.status === 'mastered') return 100;
+    if (record.status === 'learning') {
+      const total = record.correctCount + record.incorrectCount;
+      if (total === 0) return 0;
+      return Math.round((record.correctCount / total) * 75);
+    }
+    return 0;
+  };
+
+  // 时间范围标签
+  const timeRangeLabels: Record<TimeRange, string> = {
+    week: '本周',
+    month: '本月',
+    quarter: '季度',
+    all: '全部'
+  };
+
   return (
     <div className="bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-100 min-h-screen font-display pb-32">
+      {/* 头部 */}
       <div className="sticky top-0 z-40 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md px-6 pt-12 pb-4 border-b border-primary/10">
         <div className="flex justify-between items-center">
           <div>
@@ -8,33 +52,56 @@ export default function Stats() {
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">每周学习计划</p>
           </div>
           <div className="flex gap-3">
-            <button className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center border border-primary/10">
+            <button className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center border border-primary/10 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
               <span className="material-icons-round text-primary">calendar_today</span>
             </button>
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary shadow-sm">
-              <img alt="Profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBn-Wpd4OHRRC77cdGzZ8kzrr9Ovy2AuvG-tajqQVUWwbnn4Zp-jKiKA1UPWunGZK6nDimCjVM-1T_2VtrrHfrTUAniaHH-eNn4Sft5T9COSPqle50UP0UVwyAb_T9XapTTAS_SCHogFG4I2Xnf5tjAXHMvk4Li0EOUMSXDPJ2nmO3S_TuuOqOgQt20CjYmK0pGU_X-jZ9nn1a9i4KstXvD7RZk0XXuw-vFrAkagLeut-a1Nuvcx8muVeLJsuByDQNyf1KTPGoO7ozv" />
-            </div>
+            <button
+              onClick={() => navigate('/profile')}
+              className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary shadow-sm hover:opacity-80 transition-opacity"
+            >
+              <img alt="Profile" src={user.avatar} />
+            </button>
           </div>
         </div>
+
+        {/* 时间范围切换 */}
         <div className="mt-6 flex p-1 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl">
-          <button className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-primary">本周</button>
-          <button className="flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">本月</button>
-          <button className="flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">季度</button>
-          <button className="flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">全部</button>
+          {(['week', 'month', 'quarter', 'all'] as TimeRange[]).map(range => (
+            <button
+              key={range}
+              onClick={() => setTimeRange(range)}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${timeRange === range
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-primary'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+            >
+              {timeRangeLabels[range]}
+            </button>
+          ))}
         </div>
       </div>
 
       <main className="px-5 pt-6 space-y-8">
+        {/* 掌握情况 */}
         <section>
           <div className="flex justify-between items-end mb-4">
             <h2 className="text-sm font-bold tracking-wider text-slate-400">掌握情况</h2>
-            <span className="text-xs font-semibold text-primary">总词汇量 2,450</span>
+            <span className="text-xs font-semibold text-primary">总词汇量 {stats.totalWords}</span>
           </div>
           <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-primary/5">
             <div className="h-8 w-full flex rounded-full overflow-hidden mb-6">
-              <div className="h-full bg-primary" style={{ width: '45%' }}></div>
-              <div className="h-full bg-learning" style={{ width: '30%' }}></div>
-              <div className="h-full bg-inactive dark:bg-slate-700" style={{ width: '25%' }}></div>
+              <div
+                className="h-full bg-primary transition-all duration-500"
+                style={{ width: `${(stats.masteredCount / stats.totalWords) * 100}%` }}
+              ></div>
+              <div
+                className="h-full bg-learning transition-all duration-500"
+                style={{ width: `${(stats.learningCount / stats.totalWords) * 100}%` }}
+              ></div>
+              <div
+                className="h-full bg-inactive dark:bg-slate-700 transition-all duration-500"
+                style={{ width: `${(stats.newCount / stats.totalWords) * 100}%` }}
+              ></div>
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div className="text-center">
@@ -42,26 +109,27 @@ export default function Stats() {
                   <span className="w-2 h-2 rounded-full bg-primary"></span>
                   <span className="text-[10px] font-bold text-slate-400 uppercase">已掌握</span>
                 </div>
-                <p className="text-lg font-bold">1,102</p>
+                <p className="text-lg font-bold">{stats.masteredCount}</p>
               </div>
               <div className="text-center border-x border-slate-100 dark:border-slate-800">
                 <div className="flex items-center justify-center gap-1.5 mb-1">
                   <span className="w-2 h-2 rounded-full bg-learning"></span>
                   <span className="text-[10px] font-bold text-slate-400 uppercase">学习中</span>
                 </div>
-                <p className="text-lg font-bold">735</p>
+                <p className="text-lg font-bold">{stats.learningCount}</p>
               </div>
               <div className="text-center">
                 <div className="flex items-center justify-center gap-1.5 mb-1">
                   <span className="w-2 h-2 rounded-full bg-inactive dark:bg-slate-700"></span>
                   <span className="text-[10px] font-bold text-slate-400 uppercase">未开始</span>
                 </div>
-                <p className="text-lg font-bold">613</p>
+                <p className="text-lg font-bold">{stats.newCount}</p>
               </div>
             </div>
           </div>
         </section>
 
+        {/* 记忆曲线 */}
         <section>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-sm font-bold tracking-wider text-slate-400">记忆曲线</h2>
@@ -77,12 +145,19 @@ export default function Stats() {
             </div>
             <div className="relative h-40 w-full mb-4">
               <svg className="w-full h-full" viewBox="0 0 400 150">
-                <path className="text-primary opacity-30" d="M0,20 C50,25 100,80 150,90 C200,100 250,115 400,120" fill="none" stroke="currentColor" strokeWidth="3"></path>
-                <path className="text-primary" d="M0,20 C50,22 100,50 150,55 C200,60 250,70 400,75" fill="none" stroke="currentColor" strokeWidth="4"></path>
+                {/* 背景线 */}
                 <line className="text-slate-100 dark:text-slate-800" stroke="currentColor" strokeWidth="1" x1="0" x2="400" y1="140" y2="140"></line>
                 <line className="text-slate-100 dark:text-slate-800" stroke="currentColor" strokeDasharray="4" x1="0" x2="400" y1="100" y2="100"></line>
                 <line className="text-slate-100 dark:text-slate-800" stroke="currentColor" strokeDasharray="4" x1="0" x2="400" y1="60" y2="60"></line>
                 <line className="text-slate-100 dark:text-slate-800" stroke="currentColor" strokeDasharray="4" x1="0" x2="400" y1="20" y2="20"></line>
+
+                {/* 理论曲线 */}
+                <path className="text-primary opacity-30" d="M0,20 C50,25 100,80 150,90 C200,100 250,115 400,120" fill="none" stroke="currentColor" strokeWidth="3"></path>
+
+                {/* 实际曲线 */}
+                <path className="text-primary" d="M0,20 C50,22 100,50 150,55 C200,60 250,70 400,75" fill="none" stroke="currentColor" strokeWidth="4"></path>
+
+                {/* 当前点 */}
                 <circle cx="150" cy="55" fill="white" r="5" stroke="#19e65e" strokeWidth="3"></circle>
               </svg>
               <div className="absolute left-0 top-0 h-full flex flex-col justify-between py-1 text-[8px] font-bold text-slate-400">
@@ -104,81 +179,81 @@ export default function Stats() {
           </div>
         </section>
 
+        {/* 最近学习 */}
         <section>
           <div className="flex justify-between items-end mb-4">
             <h2 className="text-sm font-bold tracking-wider text-slate-400">最近学习</h2>
-            <button className="text-xs font-bold text-primary">查看全部</button>
+            <button
+              onClick={() => navigate('/learn?mode=review')}
+              className="text-xs font-bold text-primary hover:underline"
+            >
+              查看全部
+            </button>
           </div>
-          <div className="space-y-3">
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl flex items-center justify-between border border-primary/5 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <span className="text-primary font-bold text-lg">E</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-base leading-tight">Ephemeral</h3>
-                  <p className="text-xs text-slate-500">短暂的；生命极短的。</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full border-2 border-primary border-t-inactive dark:border-t-slate-700 -rotate-90">
-                  <span className="rotate-90 text-[10px] font-bold">75%</span>
-                </div>
-              </div>
-            </div>
 
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl flex items-center justify-between border border-primary/5 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-learning/10 rounded-xl flex items-center justify-center">
-                  <span className="text-learning font-bold text-lg">P</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-base leading-tight">Pragmatic</h3>
-                  <p className="text-xs text-slate-500">务实的；实事求是的。</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full border-2 border-learning border-t-inactive dark:border-t-slate-700 -rotate-90">
-                  <span className="rotate-90 text-[10px] font-bold">42%</span>
-                </div>
-              </div>
-            </div>
+          {recentRecords.length > 0 ? (
+            <div className="space-y-3">
+              {recentRecords.map(({ record, word }) => {
+                if (!word) return null;
+                const progress = getProgressPercentage(record);
 
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl flex items-center justify-between border border-primary/5 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
-                  <span className="text-white material-icons-round">check_circle</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-base leading-tight">Resilience</h3>
-                  <p className="text-xs text-slate-500">恢复力；韧性。</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white">
-                  <span className="material-icons-round text-sm">done_all</span>
-                </div>
-              </div>
+                return (
+                  <button
+                    key={record.wordId}
+                    onClick={() => navigate('/learn?mode=review')}
+                    className="w-full bg-white dark:bg-slate-900 p-4 rounded-2xl flex items-center justify-between border border-primary/5 shadow-sm hover:shadow-md transition-shadow text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${record.status === 'mastered'
+                          ? 'bg-primary'
+                          : 'bg-primary/10'
+                        }`}>
+                        {record.status === 'mastered' ? (
+                          <span className="text-white material-icons-round">check_circle</span>
+                        ) : (
+                          <span className="text-primary font-bold text-lg">{word.word[0]}</span>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-base leading-tight">{word.word}</h3>
+                        <p className="text-xs text-slate-500">{word.meaning}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {record.status === 'mastered' ? (
+                        <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white">
+                          <span className="material-icons-round text-sm">done_all</span>
+                        </div>
+                      ) : (
+                        <div
+                          className="inline-flex items-center justify-center w-10 h-10 rounded-full border-2 border-primary -rotate-90"
+                          style={{
+                            borderColor: `#19e65e`,
+                            borderRightColor: progress < 25 ? '#e2e8f0' : '#19e65e',
+                            borderTopColor: progress < 50 ? '#e2e8f0' : '#19e65e',
+                            borderLeftColor: progress < 75 ? '#e2e8f0' : '#19e65e',
+                          }}
+                        >
+                          <span className="rotate-90 text-[10px] font-bold">{progress}%</span>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl flex items-center justify-between border border-primary/5 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-learning/10 rounded-xl flex items-center justify-center">
-                  <span className="text-learning font-bold text-lg">S</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-base leading-tight">Sagacity</h3>
-                  <p className="text-xs text-slate-500">睿智；聪敏。</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="inline-flex items-center justify-center w-10 h-10 rounded-full border-2 border-learning border-r-inactive dark:border-r-slate-700 -rotate-90">
-                  <span className="rotate-90 text-[10px] font-bold">18%</span>
-                </div>
-              </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-primary/5 text-center">
+              <span className="material-icons text-4xl text-slate-300 dark:text-slate-600 mb-2">menu_book</span>
+              <p className="text-slate-500 dark:text-slate-400">还没有学习记录</p>
+              <button
+                onClick={() => navigate('/learn')}
+                className="mt-4 text-primary font-semibold text-sm hover:underline"
+              >
+                开始学习
+              </button>
             </div>
-
-          </div>
+          )}
         </section>
       </main>
     </div>

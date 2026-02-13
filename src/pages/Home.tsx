@@ -1,104 +1,190 @@
 import { useNavigate } from 'react-router-dom';
+import { useApp } from '../store/AppContext';
+import { formatDateDisplay } from '../utils/storage';
 
 export default function Home() {
   const navigate = useNavigate();
+  const { state, getStats } = useApp();
+  const { user, settings, todayLearned, todayNewWords, todayReviewWords } = state;
+  const stats = getStats();
+
+  // 计算进度
+  const progress = settings.dailyTarget > 0
+    ? Math.min((todayLearned / settings.dailyTarget) * 100, 100)
+    : 0;
+  const progressOffset = 502.6 - (502.6 * progress / 100);
+
+  // 获取当前日期
+  const today = new Date();
+  const dateDisplay = formatDateDisplay(today.toISOString());
+
+  // 生成打卡日历数据
+  const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
+  const currentDayOfWeek = today.getDay(); // 0 = 周日
+  const adjustedDay = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // 转换为周一=0
 
   return (
     <div className="flex flex-col h-full relative">
-      <div className="h-11 w-full flex justify-between items-center px-8 pt-4">
-        <span className="text-xs font-bold">9:41</span>
-        <div className="flex gap-1.5 items-center">
-          <span className="material-icons text-sm">signal_cellular_alt</span>
-          <span className="material-icons text-sm">wifi</span>
-          <span className="material-icons text-sm">battery_full</span>
-        </div>
-      </div>
-
       <header className="px-6 py-4 flex justify-between items-center">
         <div>
-          <p className="text-xs font-medium text-emerald-600/70 dark:text-primary/70 uppercase tracking-widest">10月24日 星期一</p>
-          <h1 className="text-2xl font-bold">你好, Alex! 👋</h1>
+          <p className="text-xs font-medium text-emerald-600/70 dark:text-primary/70 uppercase tracking-widest">
+            {dateDisplay}
+          </p>
+          <h1 className="text-2xl font-bold">你好, {user.name}! 👋</h1>
         </div>
-        <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-primary/20 flex items-center justify-center overflow-hidden border-2 border-primary">
+        <button
+          onClick={() => navigate('/profile')}
+          className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-primary/20 flex items-center justify-center overflow-hidden border-2 border-primary hover:opacity-80 transition-opacity"
+        >
           <img
             alt="Profile"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKjfeSGjaiSKklkUuNfXeNS3iy_NIR-sVEH-IaUfivdS4mPy4OmPVIGbWBEQgi9n1nuGu8yc4PmjqDBP5dcG1LTd7SUVUgvKtRfFRR1-_X6m3oS2A8zY6A-JtPhUP3-uYZw0eIVaw39BTBayhWsb5jjFCrogcbKpSxLOQbih_lv0W3tKhleroVX9WU3EZsnyIANu05-fDlp-S6mhSh2HPB2chMpqOnypRSAp4wRpwV_hgV_EWpLcfdsLn2Zn47tAv--eaSoOVpJeEL"
+            src={user.avatar}
           />
-        </div>
+        </button>
       </header>
 
       <main className="px-6 space-y-6 overflow-y-auto pb-32">
-        <div className="bg-emerald-50 dark:bg-primary/5 p-6 rounded-xl flex flex-col items-center justify-center border border-emerald-100 dark:border-primary/10">
+        {/* 今日目标进度环 */}
+        <button
+          onClick={() => navigate('/learn')}
+          className="w-full bg-emerald-50 dark:bg-primary/5 p-6 rounded-xl flex flex-col items-center justify-center border border-emerald-100 dark:border-primary/10 hover:bg-emerald-100 dark:hover:bg-primary/10 transition-colors"
+        >
           <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200 mb-4">今日目标</p>
           <div className="relative flex items-center justify-center">
             <svg className="w-48 h-48 transform -rotate-90">
-              <circle className="text-emerald-100 dark:text-emerald-900/30" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" strokeWidth="12"></circle>
-              <circle className="text-primary" cx="96" cy="96" fill="transparent" r="80" stroke="currentColor" strokeDasharray="502.6" strokeDashoffset="301.5" strokeLinecap="round" strokeWidth="12"></circle>
+              <circle
+                className="text-emerald-100 dark:text-emerald-900/30"
+                cx="96" cy="96" fill="transparent" r="80"
+                stroke="currentColor" strokeWidth="12"
+              ></circle>
+              <circle
+                className="text-primary transition-all duration-500"
+                cx="96" cy="96" fill="transparent" r="80"
+                stroke="currentColor"
+                strokeDasharray="502.6"
+                strokeDashoffset={progressOffset}
+                strokeLinecap="round" strokeWidth="12"
+              ></circle>
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl font-bold">20/50</span>
+              <span className="text-4xl font-bold">{todayLearned}/{settings.dailyTarget}</span>
               <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">已学单词</span>
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2">
             <span className="material-icons text-primary text-sm">bolt</span>
-            <p className="text-xs text-emerald-700 dark:text-emerald-300">加油！再学 30 个词就达标了。</p>
+            <p className="text-xs text-emerald-700 dark:text-emerald-300">
+              {todayLearned >= settings.dailyTarget
+                ? '🎉 恭喜！今日目标已达成！'
+                : `加油！再学 ${settings.dailyTarget - todayLearned} 个词就达标了。`
+              }
+            </p>
           </div>
-        </div>
+        </button>
 
+        {/* 新词/复习卡片 */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white dark:bg-emerald-900/20 p-4 rounded-xl shadow-sm border border-emerald-50 dark:border-primary/5">
+          <button
+            onClick={() => navigate('/learn?mode=new')}
+            className="bg-white dark:bg-emerald-900/20 p-4 rounded-xl shadow-sm border border-emerald-50 dark:border-primary/5 hover:shadow-md transition-shadow text-left"
+          >
             <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-primary/20 flex items-center justify-center mb-3">
               <span className="material-icons text-primary text-lg">star_outline</span>
             </div>
-            <p className="text-2xl font-bold">12</p>
+            <p className="text-2xl font-bold">{todayNewWords}</p>
             <p className="text-xs text-emerald-600/70 dark:text-emerald-400 font-medium">新词</p>
-          </div>
-          <div className="bg-white dark:bg-emerald-900/20 p-4 rounded-xl shadow-sm border border-emerald-50 dark:border-primary/5">
+          </button>
+          <button
+            onClick={() => navigate('/learn?mode=review')}
+            className="bg-white dark:bg-emerald-900/20 p-4 rounded-xl shadow-sm border border-emerald-50 dark:border-primary/5 hover:shadow-md transition-shadow text-left"
+          >
             <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-primary/20 flex items-center justify-center mb-3">
               <span className="material-icons text-primary text-lg">history_edu</span>
             </div>
-            <p className="text-2xl font-bold">38</p>
+            <p className="text-2xl font-bold">{todayReviewWords}</p>
             <p className="text-xs text-emerald-600/70 dark:text-emerald-400 font-medium">复习</p>
-          </div>
+          </button>
         </div>
 
+        {/* 连续打卡 */}
         <section className="space-y-3">
           <div className="flex justify-between items-center">
             <h2 className="text-base font-bold">连续打卡</h2>
-            <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">已连续 5 天！🔥</span>
+            <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">
+              已连续 {user.streak} 天！🔥
+            </span>
           </div>
           <div className="flex justify-between bg-white dark:bg-emerald-900/10 p-4 rounded-xl border border-emerald-50 dark:border-primary/5">
-            {['一', '二', '三', '四'].map((day) => (
-              <div key={day} className="flex flex-col items-center gap-2">
-                <span className="text-[10px] font-bold text-emerald-400">{day}</span>
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
-                  <span className="material-icons text-sm">check</span>
+            {weekDays.map((day, index) => {
+              const isPast = index < adjustedDay;
+              const isToday = index === adjustedDay;
+              const isChecked = isPast || (isToday && todayLearned > 0);
+
+              return (
+                <div key={day} className="flex flex-col items-center gap-2">
+                  <span className={`text-[10px] font-bold ${isToday ? 'text-primary' : isPast ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    {day}
+                  </span>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isChecked
+                    ? 'bg-primary text-white'
+                    : isToday
+                      ? 'bg-primary/20 border-2 border-primary text-primary'
+                      : 'bg-emerald-100 dark:bg-emerald-800 opacity-30'
+                    }`}>
+                    {isChecked ? (
+                      <span className="material-icons text-sm">check</span>
+                    ) : (
+                      <span className="text-xs font-bold">{today.getDate() - adjustedDay + index}</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-[10px] font-bold text-primary">五</span>
-              <div className="w-8 h-8 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center text-primary">
-                <span className="text-xs font-bold">24</span>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* 学习统计概览 */}
+        <section className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h2 className="text-base font-bold">词汇掌握</h2>
+            <button
+              onClick={() => navigate('/stats')}
+              className="text-xs font-bold text-primary hover:underline"
+            >
+              查看详情
+            </button>
+          </div>
+          <div className="bg-white dark:bg-emerald-900/10 p-4 rounded-xl border border-emerald-50 dark:border-primary/5">
+            <div className="h-3 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden mb-3">
+              <div className="h-full flex">
+                <div
+                  className="bg-primary"
+                  style={{ width: `${(stats.masteredCount / stats.totalWords) * 100}%` }}
+                ></div>
+                <div
+                  className="bg-learning"
+                  style={{ width: `${(stats.learningCount / stats.totalWords) * 100}%` }}
+                ></div>
               </div>
             </div>
-            <div className="flex flex-col items-center gap-2 opacity-30">
-              <span className="text-[10px] font-bold">六</span>
-              <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center">
-                <span className="text-xs font-bold">25</span>
+            <div className="flex justify-between text-xs">
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-primary"></span>
+                <span className="text-slate-500">已掌握 {stats.masteredCount}</span>
               </div>
-            </div>
-            <div className="flex flex-col items-center gap-2 opacity-30">
-              <span className="text-[10px] font-bold">日</span>
-              <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center">
-                <span className="text-xs font-bold">26</span>
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-learning"></span>
+                <span className="text-slate-500">学习中 {stats.learningCount}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+                <span className="text-slate-500">未开始 {stats.newCount}</span>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Start Learning Button - Placed in flow to avoid overlap with BottomNav */}
+        {/* 开始学习按钮 */}
         <div className="w-full pt-4">
           <button
             onClick={() => navigate('/learn')}
